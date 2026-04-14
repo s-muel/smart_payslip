@@ -6,6 +6,14 @@ import 'package:smartpayslip/UI%20Element/app_bar.dart';
 import 'package:smartpayslip/UI%20Element/slider_bar.dart';
 import 'package:smartpayslip/upload_files_page.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'split_match_page.dart';
+
+import '../models/employee_record.dart';
+import '../models/preview_match_item.dart';
+import '../services/match_service.dart';
+import 'preview_match_page.dart';
+
+import '../services/excel_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,6 +31,78 @@ class _HomePageState extends State<HomePage> {
 
   String? selectedPdfPath;
   String? selectedExcelPath;
+
+  String splitMethod = 'one_page';
+
+  List<EmployeeRecord> employees = [];
+
+  final ExcelService excelService = ExcelService();
+
+  List<PreviewMatchItem> previewMatchItems = [];
+  final MatchService matchService = MatchService();
+// Dammy data
+  final List<EmployeeRecord> sampleEmployees = [
+    EmployeeRecord(
+      employeeNumber: 'EMP001',
+      name: 'Samuel Essuman',
+      email: 'samuel@company.com',
+    ),
+    EmployeeRecord(
+      employeeNumber: 'EMP002',
+      name: 'Ama Mensah',
+      email: 'ama@company.com',
+    ),
+    EmployeeRecord(
+      employeeNumber: 'EMP003',
+      name: 'Kojo Arthur',
+      email: 'kojo@company.com',
+    ),
+  ];
+  void _showMismatchDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Mismatch Detected'),
+          content: Text(
+            'The PDF page count ($pdfPageCount) does not match the employee record count ($excelRowCount). '
+            'You can continue, but some payslips may not match correctly.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+
+                setState(() {
+                  _generatePreviewMatchItems();
+                  selectedItem = 'Preview Match';
+                });
+              },
+              child: const Text('Continue Anyway'),
+            ),
+            // ElevatedButton(
+            //   onPressed: () {
+            //     Navigator.pop(dialogContext);
+
+            //     ScaffoldMessenger.of(context).showSnackBar(
+            //       const SnackBar(
+            //         content: Text('Continuing to next stage...'),
+            //       ),
+            //     );
+            //   },
+            //   child: const Text('Continue Anyway'),
+            // ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -181,12 +261,14 @@ class _HomePageState extends State<HomePage> {
 
             if (result != null && result.files.isNotEmpty) {
               final file = result.files.single;
-              final rowCount = await _getExcelRowCount(file.path);
+              final employeeList =
+                  await excelService.getEmployeeRecords(file.path);
 
               setState(() {
                 selectedExcelFileName = file.name;
                 selectedExcelPath = file.path;
-                excelRowCount = rowCount;
+                excelRowCount = employeeList.length;
+                employees = employeeList;
               });
             }
           },
@@ -203,6 +285,54 @@ class _HomePageState extends State<HomePage> {
                       });
                     }
                   : null,
+        );
+      case 'Split & Match':
+        final bool canProceed = pdfPageCount != null && excelRowCount != null;
+
+        return SplitMatchScreen(
+          pdfPageCount: pdfPageCount,
+          excelRowCount: excelRowCount,
+          splitMethod: splitMethod,
+          onSplitMethodChanged: (value) {
+            setState(() {
+              splitMethod = value;
+            });
+          },
+          onBack: () {
+            setState(() {
+              selectedItem = 'Upload Files';
+            });
+          },
+          onStartMatching: canProceed
+              ? () {
+                  if (pdfPageCount != excelRowCount) {
+                    _showMismatchDialog();
+                  } else {
+                    setState(() {
+                      _generatePreviewMatchItems();
+                      selectedItem = 'Preview Match';
+                    });
+                  }
+                }
+              : null,
+        );
+      case 'Preview Match':
+        return PreviewMatchScreen(
+          matchItems: previewMatchItems,
+          onBack: () {
+            setState(() {
+              selectedItem = 'Split & Match';
+            });
+          },
+          onProceed: previewMatchItems.isNotEmpty
+              ? () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Proceeding to send stage...'),
+                    ),
+                  );
+                }
+              : null,
         );
 
       case 'Send Emails':
@@ -232,6 +362,14 @@ class _HomePageState extends State<HomePage> {
       default:
         return _buildDashboardScreen();
     }
+  }
+
+// this generate Preview Matched Items
+  void _generatePreviewMatchItems() {
+    previewMatchItems = matchService.generatePreviewMatches(
+      pdfPageCount: pdfPageCount ?? 0,
+      employees: employees,
+    );
   }
 
 // This method builds the Dashboard screen content
