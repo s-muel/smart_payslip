@@ -14,6 +14,7 @@ import '../services/match_service.dart';
 import 'preview_match_page.dart';
 
 import '../services/excel_service.dart';
+import '../services/pdf_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,6 +39,8 @@ class _HomePageState extends State<HomePage> {
 
   final ExcelService excelService = ExcelService();
 
+  final PdfService pdfService = PdfService();
+
   List<PreviewMatchItem> previewMatchItems = [];
   final MatchService matchService = MatchService();
 // Dammy data
@@ -58,6 +61,25 @@ class _HomePageState extends State<HomePage> {
       email: 'kojo@company.com',
     ),
   ];
+  Future<void> _splitMatchedPayslips() async {
+    final savedFiles = await pdfService.splitAndSaveMatchedPayslips(
+      sourcePdfPath: selectedPdfPath,
+      matchItems: previewMatchItems,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          savedFiles.isEmpty
+              ? 'No payslips were generated.'
+              : 'Saved ${savedFiles.length} payslip PDFs to the generated_payslips folder.',
+        ),
+      ),
+    );
+  }
+
   void _showMismatchDialog() {
     showDialog(
       context: context,
@@ -80,7 +102,7 @@ class _HomePageState extends State<HomePage> {
                 Navigator.pop(dialogContext);
 
                 setState(() {
-                  _generatePreviewMatchItems();
+                  //_generatePreviewMatchItems();
                   selectedItem = 'Preview Match';
                 });
               },
@@ -304,12 +326,13 @@ class _HomePageState extends State<HomePage> {
             });
           },
           onStartMatching: canProceed
-              ? () {
+              ? () async {
+                  await _generatePreviewMatchItems();
+
                   if (pdfPageCount != excelRowCount) {
                     _showMismatchDialog();
                   } else {
                     setState(() {
-                      _generatePreviewMatchItems();
                       selectedItem = 'Preview Match';
                     });
                   }
@@ -325,12 +348,8 @@ class _HomePageState extends State<HomePage> {
             });
           },
           onProceed: previewMatchItems.isNotEmpty
-              ? () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Proceeding to send stage...'),
-                    ),
-                  );
+              ? () async {
+                  await _splitMatchedPayslips();
                 }
               : null,
         );
@@ -365,10 +384,13 @@ class _HomePageState extends State<HomePage> {
   }
 
 // this generate Preview Matched Items
-  void _generatePreviewMatchItems() {
-    previewMatchItems = matchService.generatePreviewMatches(
-      pdfPageCount: pdfPageCount ?? 0,
+  Future<void> _generatePreviewMatchItems() async {
+    final pageTexts = await pdfService.extractTextFromPages(selectedPdfPath);
+
+    previewMatchItems = matchService.generatePreviewMatchesFromPdf(
+      pageTexts: pageTexts,
       employees: employees,
+      extractEmployeeNumber: pdfService.extractEmployeeNumber,
     );
   }
 
