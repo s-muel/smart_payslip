@@ -15,6 +15,13 @@ import 'preview_match_page.dart';
 
 import '../services/excel_service.dart';
 import '../services/pdf_service.dart';
+import '../services/email_service.dart';
+
+import '../models/smtp_settings.dart';
+import '../services/settings_service.dart';
+import 'settings_page.dart';
+
+import 'send_emails_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -43,24 +50,121 @@ class _HomePageState extends State<HomePage> {
 
   List<PreviewMatchItem> previewMatchItems = [];
   final MatchService matchService = MatchService();
+  final EmailService emailService = EmailService();
+
+  String emailSubject = 'March 2026 Payslip';
+
 // Dammy data
-  final List<EmployeeRecord> sampleEmployees = [
-    EmployeeRecord(
-      employeeNumber: 'EMP001',
-      name: 'Samuel Essuman',
-      email: 'samuel@company.com',
-    ),
-    EmployeeRecord(
-      employeeNumber: 'EMP002',
-      name: 'Ama Mensah',
-      email: 'ama@company.com',
-    ),
-    EmployeeRecord(
-      employeeNumber: 'EMP003',
-      name: 'Kojo Arthur',
-      email: 'kojo@company.com',
-    ),
-  ];
+  // final List<EmployeeRecord> sampleEmployees = [
+  //   EmployeeRecord(
+  //     employeeNumber: 'EMP001',
+  //     name: 'Samuel Essuman',
+  //     email: 'samuel@company.com',
+  //   ),
+  //   EmployeeRecord(
+  //     employeeNumber: 'EMP002',
+  //     name: 'Ama Mensah',
+  //     email: 'ama@company.com',
+  //   ),
+  //   EmployeeRecord(
+  //     employeeNumber: 'EMP003',
+  //     name: 'Kojo Arthur',
+  //     email: 'kojo@company.com',
+  //   ),
+  // ];
+
+  final SettingsService settingsService = SettingsService();
+  SmtpSettings smtpSettings = SmtpSettings.defaults();
+  Future<void> _loadSmtpSettings() async {
+    smtpSettings = await settingsService.loadSmtpSettings();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // Mailing Variables for testing
+  // final EmailService emailService = EmailService();
+
+  // final String smtpHost = 'mail.bajfreight.com';
+  // final int smtpPort = 465;
+  // final bool smtpSsl = true;
+  // final bool smtpAllowInsecure = false;
+
+  // final String senderEmail = 'samuel.essuman@bajfreight.com';
+  // final String senderPassword = '123@**bajtd**';
+  // final String senderName = 'Samuel Simon Essuman';
+  // final String emailSubject = 'Your Payslip';
+
+//Mailing method for testing
+  Future<void> _splitAndSendPayslips(String subject) async {
+    final savedFiles = await pdfService.splitAndSaveMatchedPayslips(
+      sourcePdfPath: selectedPdfPath,
+      matchItems: previewMatchItems,
+    );
+
+    if (!mounted) return;
+
+    if (savedFiles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No payslips were generated for sending.'),
+        ),
+      );
+      return;
+    }
+
+    await _loadSmtpSettings();
+
+    try {
+      final results = await emailService.sendMatchedPayslips(
+        sourcePdfPath: selectedPdfPath,
+        matchItems: previewMatchItems,
+        smtpHost: smtpSettings.smtpHost,
+        smtpPort: smtpSettings.smtpPort,
+        username: smtpSettings.senderEmail,
+        password: smtpSettings.senderPassword,
+        fromName: smtpSettings.senderName,
+        subject: subject,
+        ssl: smtpSettings.smtpSsl,
+        allowInsecure: false,
+      );
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Email Sending Summary'),
+            content: SingleChildScrollView(
+              child: Text(
+                results.map((item) {
+                  return '${item.employeeNumber} | ${item.email} | ${item.status} | ${item.details}';
+                }).join('\n'),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Email sending failed: $e'),
+        ),
+      );
+    }
+  }
+
   Future<void> _splitMatchedPayslips() async {
     final savedFiles = await pdfService.splitAndSaveMatchedPayslips(
       sourcePdfPath: selectedPdfPath,
@@ -127,6 +231,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadSmtpSettings();
+  }
+
   Widget build(BuildContext context) {
     return Scaffold(
       // appBar: AppBar(
@@ -147,7 +256,11 @@ class _HomePageState extends State<HomePage> {
               children: [
                 SideBar(
                   selectedItem: selectedItem,
-                  onItemSelected: (value) {
+                  onItemSelected: (value) async {
+                    if (value == 'Settings') {
+                      await _loadSmtpSettings();
+                    }
+
                     setState(() {
                       selectedItem = value;
                     });
@@ -348,18 +461,28 @@ class _HomePageState extends State<HomePage> {
             });
           },
           onProceed: previewMatchItems.isNotEmpty
-              ? () async {
-                  await _splitMatchedPayslips();
+              ? () {
+                  setState(() {
+                    selectedItem = 'Send Emails';
+                  });
                 }
               : null,
         );
 
       case 'Send Emails':
-        return const Center(
-          child: Text(
-            'Send Emails Screen',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return SendEmailsPage(
+          matchItems: previewMatchItems,
+          senderEmail: smtpSettings.senderEmail,
+          initialSubject: emailSubject,
+          onBack: () {
+            setState(() {
+              selectedItem = 'Preview Match';
+            });
+          },
+          onSend: (subject) async {
+            emailSubject = subject;
+            await _splitAndSendPayslips(subject);
+          },
         );
 
       case 'Reports':
@@ -371,11 +494,17 @@ class _HomePageState extends State<HomePage> {
         );
 
       case 'Settings':
-        return const Center(
-          child: Text(
-            'Settings Screen',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
+        return SettingsPage(
+          initialSettings: smtpSettings,
+          onBack: () {
+            setState(() {
+              selectedItem = 'Dashboard';
+            });
+          },
+          onSave: (settings) async {
+            await settingsService.saveSmtpSettings(settings);
+            smtpSettings = settings;
+          },
         );
 
       default:
