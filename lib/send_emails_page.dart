@@ -5,7 +5,10 @@ class SendEmailsPage extends StatefulWidget {
   final List<PreviewMatchItem> matchItems;
   final String senderEmail;
   final String initialSubject;
-  final Future<void> Function(String subject) onSend;
+  final Future<void> Function(
+    String subject,
+    void Function(int current, int total, String employeeName) onProgress,
+  ) onSend;
   final VoidCallback onBack;
 
   const SendEmailsPage({
@@ -24,6 +27,9 @@ class SendEmailsPage extends StatefulWidget {
 class _SendEmailsPageState extends State<SendEmailsPage> {
   late final TextEditingController _subjectController;
   bool _isSending = false;
+  int _currentProgress = 0;
+  int _totalProgress = 0;
+  String _currentEmployeeName = '';
 
   @override
   void initState() {
@@ -47,11 +53,80 @@ class _SendEmailsPageState extends State<SendEmailsPage> {
       return;
     }
 
+    final matchedCount =
+        widget.matchItems.where((item) => item.status == 'Matched').length;
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirm Send'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please confirm the email batch before sending.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                  'Sender: ${widget.senderEmail.isEmpty ? '-' : widget.senderEmail}'),
+              const SizedBox(height: 8),
+              Text('Subject: $subject'),
+              const SizedBox(height: 8),
+              Text('Payslips to send: $matchedCount'),
+              const SizedBox(height: 16),
+              const Text(
+                'This action cannot be undone.',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldSend != true) {
+      return;
+    }
+
     setState(() {
       _isSending = true;
+      _currentProgress = 0;
+      _totalProgress = 0;
+      _currentEmployeeName = '';
     });
 
-    await widget.onSend(subject);
+    await widget.onSend(
+      subject,
+      (current, total, employeeName) {
+        if (!mounted) return;
+
+        setState(() {
+          _currentProgress = current;
+          _totalProgress = total;
+          _currentEmployeeName = employeeName;
+        });
+      },
+    );
 
     if (!mounted) return;
 
@@ -67,7 +142,8 @@ class _SendEmailsPageState extends State<SendEmailsPage> {
     final noEmailCount =
         widget.matchItems.where((item) => item.status == 'No Email').length;
     final unmatchedCount = widget.matchItems
-        .where((item) => item.status == 'Unmatched' || item.status == 'No Employee Number')
+        .where((item) =>
+            item.status == 'Unmatched' || item.status == 'No Employee Number')
         .length;
 
     return Padding(
@@ -158,6 +234,25 @@ class _SendEmailsPageState extends State<SendEmailsPage> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                if (_isSending) ...[
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: _totalProgress == 0
+                        ? null
+                        : _currentProgress / _totalProgress,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _totalProgress == 0
+                        ? 'Preparing payslips...'
+                        : 'Sending $_currentProgress of $_totalProgress'
+                            '${_currentEmployeeName.isEmpty ? '' : ' to $_currentEmployeeName'}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

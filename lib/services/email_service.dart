@@ -31,6 +31,7 @@ class EmailService {
     bool ssl = false,
     bool allowInsecure = false,
     String outputFolderName = 'generated_payslips',
+    void Function(int current, int total, String employeeName)? onProgress,
   }) async {
     if (sourcePdfPath == null) return [];
 
@@ -55,7 +56,15 @@ class EmailService {
     final List<EmailSendResult> results = [];
 
     try {
-      for (final item in sendableItems) {
+      for (int index = 0; index < sendableItems.length; index++) {
+        final item = sendableItems[index];
+
+        onProgress?.call(
+          index + 1,
+          sendableItems.length,
+          item.employeeName,
+        );
+
         final attachmentPath = p.join(
           sourceFile.parent.path,
           outputFolderName,
@@ -81,7 +90,7 @@ class EmailService {
           ..recipients.add(item.employeeEmail)
           ..subject = subject
           ..text =
-              'Hello ${item.employeeName},\n\nPlease find attached your payslip.\n\nRegards,'
+              'Hello ${item.employeeName},\n\nPlease find attached your payslip.\n\nRegards,\n$fromName'
           ..attachments = [
             FileAttachment(attachmentFile),
           ];

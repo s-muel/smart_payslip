@@ -96,7 +96,10 @@ class _HomePageState extends State<HomePage> {
   // final String emailSubject = 'Your Payslip';
 
 //Mailing method for testing
-  Future<void> _splitAndSendPayslips(String subject) async {
+  Future<void> _splitAndSendPayslips(
+    String subject,
+    void Function(int current, int total, String employeeName) onProgress,
+  ) async {
     final savedFiles = await pdfService.splitAndSaveMatchedPayslips(
       sourcePdfPath: selectedPdfPath,
       matchItems: previewMatchItems,
@@ -127,6 +130,7 @@ class _HomePageState extends State<HomePage> {
         subject: subject,
         ssl: smtpSettings.smtpSsl,
         allowInsecure: false,
+        onProgress: onProgress,
       );
 
       if (!mounted) return;
@@ -479,9 +483,9 @@ class _HomePageState extends State<HomePage> {
               selectedItem = 'Preview Match';
             });
           },
-          onSend: (subject) async {
+          onSend: (subject, onProgress) async {
             emailSubject = subject;
-            await _splitAndSendPayslips(subject);
+            await _splitAndSendPayslips(subject, onProgress);
           },
         );
 
