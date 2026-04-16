@@ -23,6 +23,12 @@ import 'settings_page.dart';
 
 import 'send_emails_page.dart';
 
+import '../models/send_report.dart';
+import '../services/report_service.dart';
+import 'reports_page.dart';
+
+
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -53,6 +59,9 @@ class _HomePageState extends State<HomePage> {
   final EmailService emailService = EmailService();
 
   String emailSubject = 'March 2026 Payslip';
+
+  final ReportService reportService = ReportService();
+  List<SendReport> reports = [];
 
 // Dammy data
   // final List<EmployeeRecord> sampleEmployees = [
@@ -94,9 +103,15 @@ class _HomePageState extends State<HomePage> {
   // final String senderPassword = '123@**bajtd**';
   // final String senderName = 'Samuel Simon Essuman';
   // final String emailSubject = 'Your Payslip';
+  Future<void> _loadReports() async {
+    reports = await reportService.loadReports();
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
 //Mailing method for testing
-  Future<void> _splitAndSendPayslips(
+  Future<List<EmailSendResult>> _splitAndSendPayslips(
     String subject,
     void Function(int current, int total, String employeeName) onProgress,
   ) async {
@@ -105,7 +120,7 @@ class _HomePageState extends State<HomePage> {
       matchItems: previewMatchItems,
     );
 
-    if (!mounted) return;
+    if (!mounted) return [];
 
     if (savedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -113,7 +128,7 @@ class _HomePageState extends State<HomePage> {
           content: Text('No payslips were generated for sending.'),
         ),
       );
-      return;
+      return [];
     }
 
     await _loadSmtpSettings();
@@ -133,39 +148,68 @@ class _HomePageState extends State<HomePage> {
         onProgress: onProgress,
       );
 
-      if (!mounted) return;
+      await reportService.saveReport(
+        subject: subject,
+        senderEmail: smtpSettings.senderEmail,
+        results: results,
+      );
 
-      showDialog(
+      await _loadReports();
+
+      if (!mounted) return results;
+
+      final sentCount = results.where((item) => item.status == 'Sent').length;
+      final failedCount =
+          results.where((item) => item.status == 'Failed').length;
+      final skippedCount =
+          results.where((item) => item.status == 'Skipped').length;
+
+      final shouldViewReport = await showDialog<bool>(
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
-            title: const Text('Email Sending Summary'),
-            content: SingleChildScrollView(
-              child: Text(
-                results.map((item) {
-                  return '${item.employeeNumber} | ${item.email} | ${item.status} | ${item.details}';
-                }).join('\n'),
-              ),
+            title: const Text('Sending Complete'),
+            content: Text(
+              'Payslip sending has finished.\n\n'
+              'Sent: $sentCount\n'
+              'Failed: $failedCount\n'
+              'Skipped: $skippedCount',
             ),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(dialogContext);
+                  Navigator.pop(dialogContext, false);
                 },
-                child: const Text('OK'),
+                child: const Text('Close'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('View Report'),
               ),
             ],
           );
         },
       );
+
+      if (shouldViewReport == true && mounted) {
+        setState(() {
+          selectedItem = 'Reports';
+        });
+      }
+
+      return results;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return [];
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Email sending failed: $e'),
         ),
       );
+
+      return [];
     }
   }
 
@@ -238,6 +282,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadSmtpSettings();
+    _loadReports();
   }
 
   Widget build(BuildContext context) {
@@ -263,6 +308,10 @@ class _HomePageState extends State<HomePage> {
                   onItemSelected: (value) async {
                     if (value == 'Settings') {
                       await _loadSmtpSettings();
+                    }
+
+                    if (value == 'Reports') {
+                      await _loadReports();
                     }
 
                     setState(() {
@@ -490,12 +539,7 @@ class _HomePageState extends State<HomePage> {
         );
 
       case 'Reports':
-        return const Center(
-          child: Text(
-            'Reports Screen',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        );
+        return ReportsPage(reports: reports);
 
       case 'Settings':
         return SettingsPage(

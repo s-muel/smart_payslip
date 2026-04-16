@@ -22,12 +22,10 @@ class SideBar extends StatelessWidget {
             height: 80,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             alignment: Alignment.centerLeft,
-            child: const Text(
-              'Payslip System',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Image.asset(
+              'assets/images/company_logo.png',
+              height: 42,
+              fit: BoxFit.contain,
             ),
           ),
           const Divider(height: 1),

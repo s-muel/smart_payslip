@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartpayslip/home_page.dart';
+import 'package:smartpayslip/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -33,7 +34,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: HomePage(),
+      home: const SplashScreen(),
+      // home: HomePage(),
       //home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }

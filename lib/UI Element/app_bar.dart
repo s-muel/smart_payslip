@@ -40,6 +40,24 @@ class TopBar extends StatelessWidget {
                   // TODO: Open settings
                 },
               ),
+              const SizedBox(width: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1FF),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFBFD3FF)),
+                ),
+                child: const Text(
+                  'Version : Beta 0.1',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F3C88),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
