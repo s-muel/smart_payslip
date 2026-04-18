@@ -40,6 +40,7 @@ dependencies:
   mailer: ^7.1.0
   path: ^1.9.1
   shared_preferences: ^2.5.5
+  msix: ^3.16.13
 
 dev_dependencies:
   flutter_test:
@@ -94,3 +95,17 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+
+# Adding windows installer 
+msix_config:
+  display_name: BAJ Smart Payslip
+  publisher_display_name: Samuel S Essuman
+  identity_name: BAJ.SmartPayslip
+  msix_version: 0.1.0.1
+  architecture: x64
+  capabilities: internetClient
+  logo_path: assets/images/company_logo.png
+  publisher: CN=BAJ I.T
+  certificate_path: C:\Users\IT-OFFICER\Desktop\Software Development\smartpayslip\certs\baj_smartpayslip_test.pfx
+  certificate_password: l3tme1N@1

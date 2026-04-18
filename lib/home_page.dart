@@ -27,8 +27,6 @@ import '../models/send_report.dart';
 import '../services/report_service.dart';
 import 'reports_page.dart';
 
-
-
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -115,6 +113,27 @@ class _HomePageState extends State<HomePage> {
     String subject,
     void Function(int current, int total, String employeeName) onProgress,
   ) async {
+    await _loadSmtpSettings();
+
+    if (smtpSettings.smtpHost.trim().isEmpty ||
+        smtpSettings.senderEmail.trim().isEmpty ||
+        smtpSettings.senderPassword.trim().isEmpty ||
+        smtpSettings.senderName.trim().isEmpty ||
+        smtpSettings.smtpPort <= 0) {
+      if (!mounted) return [];
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Please configure SMTP settings before sending emails.'),
+        ),
+      );
+
+      return [];
+    }
+
+    onProgress(0, 0, 'Splitting payslips...');
+
     final savedFiles = await pdfService.splitAndSaveMatchedPayslips(
       sourcePdfPath: selectedPdfPath,
       matchItems: previewMatchItems,
@@ -131,10 +150,9 @@ class _HomePageState extends State<HomePage> {
       return [];
     }
 
-    await _loadSmtpSettings();
-
     try {
-      final results = await emailService.sendMatchedPayslips(
+      final results = await emailService
+          .sendMatchedPayslips(
         sourcePdfPath: selectedPdfPath,
         matchItems: previewMatchItems,
         smtpHost: smtpSettings.smtpHost,
@@ -146,6 +164,14 @@ class _HomePageState extends State<HomePage> {
         ssl: smtpSettings.smtpSsl,
         allowInsecure: false,
         onProgress: onProgress,
+      )
+          .timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {
+          throw Exception(
+            'Email server did not respond. Please check SMTP settings and internet connection.',
+          );
+        },
       );
 
       await reportService.saveReport(

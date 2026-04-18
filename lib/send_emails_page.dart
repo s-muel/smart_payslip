@@ -115,24 +115,26 @@ class _SendEmailsPageState extends State<SendEmailsPage> {
       _currentEmployeeName = '';
     });
 
-    await widget.onSend(
-      subject,
-      (current, total, employeeName) {
-        if (!mounted) return;
+    try {
+      await widget.onSend(
+        subject,
+        (current, total, employeeName) {
+          if (!mounted) return;
 
-        setState(() {
-          _currentProgress = current;
-          _totalProgress = total;
-          _currentEmployeeName = employeeName;
-        });
-      },
-    );
+          setState(() {
+            _currentProgress = current;
+            _totalProgress = total;
+            _currentEmployeeName = employeeName;
+          });
+        },
+      );
+    } finally {
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    setState(() {
-      _isSending = false;
-    });
+      setState(() {
+        _isSending = false;
+      });
+    }
   }
 
   @override
