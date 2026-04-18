@@ -97,6 +97,7 @@ class PdfService {
 
         try {
           outputDocument.pageSettings.size = sourcePage.size;
+          outputDocument.pageSettings.margins.all = 0;
           final newPage = outputDocument.pages.add();
           newPage.graphics.drawPdfTemplate(template, Offset.zero);
 

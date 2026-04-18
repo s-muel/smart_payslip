@@ -50,7 +50,7 @@ class TopBar extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFBFD3FF)),
                 ),
                 child: const Text(
-                  'Version : Beta 0.1.1',
+                  'Version : Beta 0.1.2',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
