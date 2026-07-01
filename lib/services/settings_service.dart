@@ -9,6 +9,8 @@ class SettingsService {
   static const _senderEmailKey = 'sender_email';
   static const _senderPasswordKey = 'sender_password';
   static const _senderNameKey = 'sender_name';
+  // This field will be inserted by the User on the send mail page, so we don't need to save it in the settings
+   //
   static const _emailSubjectKey = 'email_subject';
 
   Future<SmtpSettings> loadSmtpSettings() async {
